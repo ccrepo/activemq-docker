@@ -1,0 +1,408 @@
+# Dockerfile
+
+# Use the official Ubuntu 24.04 base image
+FROM ubuntu:24.04
+
+# Set shell
+SHELL ["/bin/sh", "-c"]
+
+# Environment
+ARG ACTIVEMQ_DOCKER_GITUSER=default_value
+ARG ACTIVEMQ_DOCKER_GITSERVER=default_value
+ARG ACTIVEMQ_DOCKER_GITCLIENT=default_value
+ARG ACTIVEMQ_DOCKER_GITCONSUMER=default_value
+ARG ACTIVEMQ_DOCKER_GITPASSWORD=default_value
+ARG ACTIVEMQ_DOCKER_ACTIVEMQSHA512=default_value
+ARG ACTIVEMQ_DOCKER_ACTIVEMQPACKAGENAME=default_value
+ARG ACTIVEMQ_DOCKER_ACTIVEMQDOWNLOAD=default_value
+ARG ACTIVEMQ_DOCKER_GRADLEPACKAGENAME=default_value
+ARG ACTIVEMQ_DOCKER_GRADLEDOWNLOAD=default_value
+ARG ACTIVEMQ_DOCKER_SERVERHOSTNAME=default_value
+ARG ACTIVEMQ_DOCKER_USERNAME=default_value
+ARG ACTIVEMQ_DOCKER_USERPASSWORD=default_value
+
+ARG DOCKER_INSTALL_DIR=/usr/local/src
+ARG DOCKER_LOG_DIR=/var/log
+ARG DOCKER_INSTALL_CACHEDIR=/var/lib/apt/lists
+ARG DOCKER_GRADLE_INSTALLDIR=/opt/gradle
+ARG DOCKER_GRADLE_PROFILEDIR=/etc/profile.d
+ARG CATALINA_BASE=/var/lib/tomcat10
+ARG CATALINA_HOME=/usr/share/tomcat10
+ARG SSL_CERTDIR=/etc/ssl/certs
+ARG APACHE_CONFIG_DIR=/etc/apache2
+ARG HOMEDIR=/root 
+
+# Info
+RUN bash -c "echo starting using github user ${ACTIVEMQ_DOCKER_GITUSER} building ${ACTIVEMQ_DOCKER_GITSERVER}, ${ACTIVEMQ_DOCKER_GITCLIENT}, ${ACTIVEMQ_DOCKER_GITCONSUMER}"
+
+# Install apt-utils
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install necessary build tools for Java
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y openjdk-21-jdk && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install tomcat
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y tomcat10 && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install net-tools
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y net-tools && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install apache2
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apache2 && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install certbot python3-certbot-apache
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot-apache && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install other named tools
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y git software-properties-common curl wget openssl gosu openssh-server xemacs21 unzip zip vim && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install build tools
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install mysql client
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-client && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install Maven
+RUN apt-get update && \
+DEBIAN_FRONTEND=noninteractive apt-get install -y maven && \
+rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install activemq
+#RUN apt-get update && \
+#    DEBIAN_FRONTEND=noninteractive apt-get install -y activemq && \
+#    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+
+# Install tini
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y tini && \
+    rm -rf ${DOCKER_INSTALL_CACHEDIR}/*
+    
+# Set the working directory
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+# Manual gradle
+#RUN wget ${ACTIVEMQ_DOCKER_GRADLEDOWNLOAD}
+
+#RUN unzip -d ${DOCKER_GRADLE_INSTALLDIR} ${ACTIVEMQ_DOCKER_GRADLEPACKAGENAME}.zip
+
+#WORKDIR ${DOCKER_GRADLE_INSTALLDIR}
+
+#RUN ln -s gradle-* current
+
+#RUN echo "" > ${DOCKER_GRADLE_PROFILEDIR}/gradle.sh
+
+#RUN echo export GRADLE_HOME=${DOCKER_GRADLE_INSTALLDIR}/current > ${DOCKER_GRADLE_PROFILEDIR}/gradle.sh
+
+#RUN echo 'export PATH=${GRADLE_HOME}/bin:${PATH}' >> ${DOCKER_GRADLE_PROFILEDIR}/gradle.sh
+
+#RUN chmod +x ${DOCKER_GRADLE_PROFILEDIR}/gradle.sh
+
+#RUN echo "" >> ${HOME}/.bashrc
+#RUN echo ". ${DOCKER_GRADLE_PROFILEDIR}/gradle.sh" >> ${HOME}/.bashrc
+
+# Security
+RUN mkdir ${SSL_CERTDIR}/activemq
+
+RUN chmod 750 ${SSL_CERTDIR}/activemq
+
+RUN chgrp www-data ${SSL_CERTDIR}/activemq
+
+WORKDIR ${SSL_CERTDIR}/activemq
+
+#
+
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ${SSL_CERTDIR}/activemq/${ACTIVEMQ_DOCKER_SERVERHOSTNAME}.key \
+    -out ${SSL_CERTDIR}/activemq/${ACTIVEMQ_DOCKER_SERVERHOSTNAME}.crt -subj "/C=US/DC=State/W=City/O=Org/OU=Org/CN=${ACTIVEMQ_DOCKER_SERVERHOSTNAME}"
+
+RUN openssl genpkey -out ${SSL_CERTDIR}/activemq/server-private.key -algorithm RSA -pkeyopt rsa_keygen_bits:4096
+
+RUN openssl rsa -pubout -outform pem -in ${SSL_CERTDIR}/activemq/server-private.key -out ${SSL_CERTDIR}/activemq/server-public.key
+
+RUN openssl genpkey -out ${SSL_CERTDIR}/activemq/client-private.key -algorithm RSA -pkeyopt rsa_keygen_bits:4096
+
+RUN openssl rsa -pubout -outform pem -in ${SSL_CERTDIR}/activemq/client-private.key -out ${SSL_CERTDIR}/activemq/client-public.key 
+
+#
+
+RUN if [ "${ACTIVEMQ_DOCKER_USERNAME}" == "" ] || [ "${ACTIVEMQ_DOCKER_USERPASSWORD}" == "" ]; then echo "ACTIVEMQ_DOCKER_USERNAME or ACTIVEMQ_DOCKER_USERPASSWORD is empty"; exit 1; fi
+
+RUN ( echo ${ACTIVEMQ_DOCKER_USERNAME} ; echo ${ACTIVEMQ_DOCKER_USERPASSWORD} ; echo -n `LC_ALL=C < /dev/urandom tr -dc 'A-Za-z0-9_' | head -c 100` ) > ${SSL_CERTDIR}/activemq/server-credentials.txt
+
+RUN openssl pkeyutl -encrypt -pubin -inkey ${SSL_CERTDIR}/activemq/server-public.key -in ${SSL_CERTDIR}/activemq/server-credentials.txt -pkeyopt rsa_padding_mode:pkcs1 | base64 -w 0 > ${SSL_CERTDIR}/activemq/server-credentials
+
+RUN ( echo ${ACTIVEMQ_DOCKER_USERNAME} ; echo ${ACTIVEMQ_DOCKER_USERPASSWORD} ; echo -n `LC_ALL=C < /dev/urandom tr -dc 'A-Za-z0-9_' | head -c 100` ) > ${SSL_CERTDIR}/activemq/client-credentials.txt
+
+RUN openssl pkeyutl -encrypt -pubin -inkey ${SSL_CERTDIR}/activemq/client-public.key -in ${SSL_CERTDIR}/activemq/client-credentials.txt -pkeyopt rsa_padding_mode:pkcs1 | base64 -w 0 > ${SSL_CERTDIR}/activemq/client-credentials
+
+# Install server
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+RUN echo git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITSERVER}.git"
+
+RUN git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITSERVER}.git"
+
+RUN cp -f ${SSL_CERTDIR}/activemq/server-private.key ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITSERVER}/${ACTIVEMQ_DOCKER_GITSERVER}/src/main/webapp/WEB-INF/key/server-private.key
+
+RUN cp -f ${SSL_CERTDIR}/activemq/server-credentials ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITSERVER}/${ACTIVEMQ_DOCKER_GITSERVER}/src/main/webapp/WEB-INF/security/credentials
+
+WORKDIR ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITSERVER}/bin
+
+RUN ./c
+
+# Install client
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+RUN echo git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITCLIENT}.git"
+
+RUN git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITCLIENT}.git"
+
+WORKDIR ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITCLIENT}/bin
+
+RUN ./c
+
+# Install consumer
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+RUN echo git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITCONSUMER}.git"
+
+RUN git clone "https://${ACTIVEMQ_DOCKER_GITUSER}:${ACTIVEMQ_DOCKER_GITPASSWORD}@github.com/${ACTIVEMQ_DOCKER_GITUSER}/${ACTIVEMQ_DOCKER_GITCONSUMER}.git"
+
+WORKDIR ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITCONSUMER}/bin
+
+RUN ./c
+
+# Setup ssh
+
+WORKDIR ${HOMEDIR}
+
+RUN if [ ! -d .ssh ]; then mkdir .ssh; fi; if [ ! -d .ssh ]; then echo ".ssh dir missing"; exit 1; fi
+
+RUN chmod 700 .ssh 
+
+WORKDIR ${HOMEDIR}/.ssh 
+
+COPY ./authorized_keys ${DOCKER_INSTALL_DIR}/authorized_keys 
+
+RUN if [ -f ${HOMEDIR}/.ssh/authorized_keys ]; then (echo "" >> ${HOMEDIR}/.ssh/authorized_keys); fi    
+
+RUN cat ${DOCKER_INSTALL_DIR}/authorized_keys >> ${HOMEDIR}/.ssh/authorized_keys
+
+RUN chmod 600 ${HOMEDIR}/.ssh/authorized_keys
+
+RUN service ssh start ; sleep 10 ; service ssh stop 
+
+# Install active MQ
+RUN useradd -r -s /bin/false activemq
+
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+RUN mkdir activemq
+
+RUN chmod 750 activemq
+
+RUN chown activemq activemq
+
+RUN wget "${ACTIVEMQ_DOCKER_ACTIVEMQDOWNLOAD}" 
+
+RUN SHA512="`sha512sum ${ACTIVEMQ_DOCKER_ACTIVEMQPACKAGENAME}.zip | cut -d' ' -f1`"; if [[ "${SHA512}" != "${ACTIVEMQ_DOCKER_ACTIVEMQSHA512}" ]]; then echo "sha512 invalid ${SHA512}"; exit 1; fi  
+
+WORKDIR ${DOCKER_INSTALL_DIR}/activemq
+
+RUN unzip ../${ACTIVEMQ_DOCKER_ACTIVEMQPACKAGENAME}.zip
+
+RUN ln -s activemq* current
+
+WORKDIR ${DOCKER_INSTALL_DIR}/activemq/current
+
+RUN mvn clean install -DskipTests
+
+RUN if [ ! -d ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target ]; then echo "missing dir ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target "; exit 1; fi
+
+WORKDIR ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target
+
+RUN tar -xzf apache-activemq-*.gz
+
+RUN rm -fr apache-activemq-*.gz apache-activemq-*.zip
+
+RUN ln -s apache-activemq-* current 
+
+WORKDIR ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target/current 
+
+RUN echo "" >> ${HOME}/.bashrc
+RUN echo "export ACTIVEMQ_HOME=${DOCKER_INSTALL_DIR}/activemq/current/assembly/target/current" >> ${HOME}/.bashrc
+RUN echo 'export ACTIVEMQ_BASE=${ACTIVEMQ_HOME}' >> ${HOME}/.bashrc
+RUN echo 'export ACTIVEMQ_OPTS_MEMORY="-Xms512M -Xmx1024M"' >> ${HOME}/.bashrc
+RUN echo "export ACTIVEMQ_OPTS=${ACTIVEMQ_OPTS_MEMORY}" >> ${HOME}/.bashrc
+RUN echo "export PATH=${PATH}:${ACTIVEMQ_HOME}/bin" >> ${HOME}/.bashrc
+
+#WORKDIR ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target/current/conf
+#
+#ARG LHS10='policyEntry topic=">" '
+#ARG RHS10='policyEntry topic=">" persistent="true" '
+#RUN sed -i.bak11 "s|${LHS10}|${RHS10}|" activemq.xml
+#
+#WORKDIR ${DOCKER_INSTALL_DIR}/activemq/current/assembly/target/current
+
+RUN chown -R activemq:activemq ${DOCKER_INSTALL_DIR}/activemq/current
+
+# Create startup
+
+WORKDIR /
+
+COPY ./startup.sh startup.sh
+
+RUN chmod 555 startup.sh
+
+# Create log directory
+
+RUN mkdir ${DOCKER_LOG_DIR}/activemq
+
+RUN chmod 750 ${DOCKER_LOG_DIR}/activemq
+
+RUN chgrp www-data ${DOCKER_LOG_DIR}/activemq
+
+# Apache modules
+RUN a2enmod ssl
+RUN a2ensite default-ssl.conf
+RUN a2enmod proxy
+RUN a2enmod proxy_http
+RUN a2enmod headers
+RUN apachectl stop
+
+# Set the working directory
+WORKDIR ${APACHE_CONFIG_DIR}/sites-enabled
+
+RUN mv -f default-ssl.conf default-ssl.conf.bak0
+
+RUN cp -f default-ssl.conf.bak0 default-ssl.conf 
+
+# Update apache ssl conf
+ARG LHS1=/etc/ssl/certs/ssl-cert-snakeoil.pem
+ARG RHS1=${SSL_CERTDIR}/activemq/${ACTIVEMQ_DOCKER_SERVERHOSTNAME}.crt
+RUN sed -i.bak1 "s|${LHS1}|${RHS1}|" default-ssl.conf
+
+ARG LHS2=/etc/ssl/private/ssl-cert-snakeoil.key
+ARG RHS2=${SSL_CERTDIR}/activemq/${ACTIVEMQ_DOCKER_SERVERHOSTNAME}.key
+RUN sed -i.bak2 "s|${LHS2}|${RHS2}|" default-ssl.conf
+
+# ARG LHS3='#SSLCertificateChainFile /etc/apache2/ssl.crt/server-ca.crt'
+# ARG RHS3='SSLCertificateChainFile ${SSL_CERTDIR}/activemq/${ACTIVEMQ_DOCKER_SERVERHOSTNAME}.ca-bundle'
+# RUN sed -i.bak3 "s|${LHS3}|${RHS3}|" default-ssl.conf
+
+ARG LHS4=SSLEngine off
+ARG RHS4=SSLEngine on
+RUN sed -i.bak4 "s|${LHS4}|${RHS4}|" default-ssl.conf
+
+ARG LHS5='SSLEngine on'
+ARG RHS5='\nServerName FOOBAR2\nServerAlias FOOBAR2\nSSLEngine on\nSSLProtocol -all +TLSv1.2 +TLSv1.3\nSSLCipherSuite HIGH:!aNULL:!MD5:!3DES:!CAMELLIA\nSSLHonorCipherOrder on\nHeader always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"\nHeader always set X-Content-Type-Options "nosniff"\nHeader always set X-Frame-Options "SAMEORIGIN"\nHeader always set Referrer-Policy "strict-origin-when-cross-origin"\nFOOBAR1\nHeader always set X-XSS-Protection "1; mode=block"\n'
+RUN sed -i.bak5 "s|${LHS5}|${RHS5}|" default-ssl.conf
+
+ARG LHS7='FOOBAR1'
+ARG RHS7='\nHeader always set Content-Security-Policy "default-src SINGLEQUOTE1noneSINGLEQUOTE2; frame-ancestors SINGLEQUOTE3noneSINGLEQUOTE4;"\n'
+RUN sed -i.bak7 "s|${LHS7}|${RHS7}|" default-ssl.conf
+RUN sed -i.bak8 "s|SINGLEQUOTE[1-4]|'|g" default-ssl.conf
+
+ARG LHS9='FOOBAR2'
+ARG RHS9='localhost'
+RUN sed -i.bak9 "s|${LHS9}|${RHS9}|" default-ssl.conf
+
+# Config
+RUN cp -f default-ssl.conf default-ssl.conf.CHECKPOINT
+
+# Check config
+RUN if [ ! -f default-ssl.conf ] || [ ! -f default-ssl.conf.CHECKPOINT ]; then echo "missing default-ssl.conf "; exit 1; fi
+
+RUN awk 'BEGIN { found = 0; RS = "\0"; ORS = ""; }                         \
+     /<\/Directory>[[:space:]\n]*<\/VirtualHost>/ && !found {              \
+         sub(/<\/Directory>[[:space:]\n]*<\/VirtualHost>/, "\n</Directory>\nProxyRequests Off\n<LocationMatch \"^/connection/exists(/.*)?$\">\nRequire all denied\n</LocationMatch>\n<LocationMatch \"^/connection/connection/exists(/.*)?$\">\nRequire all denied\n</LocationMatch>\n\nProxyPreserveHost On\nProxyPass / http://localhost:8080/\nProxyPassReverse / http://localhost:8080/\n</VirtualHost>"); \
+         found = 1;                                                        \
+     }                                                                     \
+     { print; }' default-ssl.conf.CHECKPOINT > default-ssl.conf
+
+RUN apachectl start
+
+# Server applicaton war
+RUN if [ ! -e "${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITSERVER}/${ACTIVEMQ_DOCKER_GITSERVER}/build/libs/activemq.war" ]; then echo "missing application war file "; exit 1; fi
+
+RUN cp ${DOCKER_INSTALL_DIR}/${ACTIVEMQ_DOCKER_GITSERVER}/${ACTIVEMQ_DOCKER_GITSERVER}/build/libs/activemq.war ${CATALINA_BASE}/webapps/activemq.war
+
+RUN if [ ! -f ${CATALINA_BASE}/webapps/activemq.war ]; then echo "missing application war copy "; exit 1; fi
+
+RUN sleep 10
+
+# Check config
+RUN if [ ! -f ${CATALINA_BASE}/conf/server.xml ]; then echo "missing server.xml "; exit 1; fi
+
+RUN cp -f ${CATALINA_BASE}/conf/server.xml ${CATALINA_BASE}/conf/server.xml.bak1
+
+ARG CONTEXT_PART1="<Context antiJARLocking=\"true\" docBase=\"activemq\" path=\"/activemq\" reloadable=\"true\" >"
+
+ARG CONTEXT_PART2="<Resource auth=\"Container\" brokerName=\"LocalActiveMQBroker\" brokerURL=\"tcp://localhost:61616\" description=\"JMS Connection Factory\" factory=\"org.apache.activemq.jndi.JNDIReferenceFactory\" name=\"jms/ConnectionFactory\" type=\"org.apache.activemq.ActiveMQConnectionFactory\" useEmbeddedBroker=\"false\" />"
+
+ARG CONTEXT_PART3="<Resource auth=\"Container\" factory=\"org.apache.activemq.jndi.JNDIReferenceFactory\" name=\"jms/topic/CCTopic\" physicalName=\"CC.MQ.TOPIC\" type=\"org.apache.activemq.command.ActiveMQTopic\" />"
+
+ARG CONTEXT_PART4="<Resource auth=\"Container\" factory=\"org.apache.activemq.jndi.JNDIReferenceFactory\" name=\"jms/queue/CCQueue\" physicalName=\"CC.MQ.QUEUE\" type=\"org.apache.activemq.command.ActiveMQQueue\" />"
+
+ARG CONTEXT_PART5="</Context>"
+
+ARG CONTEXT="${CONTEXT_PART1}${CONTEXT_PART2}${CONTEXT_PART3}${CONTEXT_PART4}${CONTEXT_PART5}"
+
+RUN awk 'BEGIN { found = 0; RS = "\0"; ORS = ""; }                                                                          \
+      /<\/Host>[[:space:]\n]*<\/Engine>/ && !found {                                                                        \
+         sub(/<\/Host>[[:space:]\n]*<\/Engine>/, "FOOBAR\n</Host></Engine>");                                               \
+         found = 1;                                                                                                         \
+     }                                                                                                                      \
+     { print; }' ${CATALINA_BASE}/conf/server.xml.bak1 > ${CATALINA_BASE}/conf/server.xml
+
+RUN sed -i.bak10 "s|FOOBAR|${CONTEXT}|" ${CATALINA_BASE}/conf/server.xml
+
+RUN cp -f ${CATALINA_BASE}/conf/server.xml ${CATALINA_BASE}/conf/server.xml.bak2
+
+RUN if [ ! -f ${CATALINA_BASE}/conf/server.xml.bak2 ]; then echo "missing server.xml.bak2 "; exit 1; fi
+
+# Empty default homepages
+RUN echo "." > ${CATALINA_BASE}/webapps/ROOT/index.html
+RUN echo "." > /var/www/html/index.html
+
+# Expose
+
+EXPOSE 22
+EXPOSE 80
+EXPOSE 443
+EXPOSE 8080
+EXPOSE 8161
+EXPOSE 8443
+EXPOSE 61616
+
+# Set CATALINA_BASE and update PATH to include catalina.sh
+ENV CATALINA_BASE=${CATALINA_BASE}
+ENV CATALINA_HOME=${CATALINA_HOME}
+ENV PATH=${CATALINA_HOME}/bin:$PATH
+
+# Startup
+
+WORKDIR ${DOCKER_INSTALL_DIR}
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["/startup.sh"]
+
+

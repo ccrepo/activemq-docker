@@ -1,0 +1,33 @@
+export BUILD_DIR=build
+export TAG_ORG=activemq
+export TAG_PREFIX_ACTIVESERVER=`echo "${TAG_ORG}/${TAG_ORG}" | tr '[:upper:]' '[:lower:]' `
+
+export TAG_SERVER=server
+export TAG_ID_SERVER=${TAG_ORG}-${TAG_SERVER}
+export TAG_PREFIX_SERVER=`echo "${TAG_ORG}/${TAG_ID_SERVER}" | tr '[:upper:]' '[:lower:]' `
+
+export TAG_CLIENT=client
+export TAG_ID_CLIENT=${TAG_ORG}-${TAG_CLIENT}
+export TAG_PREFIX_CLIENT=`echo "${TAG_ORG}/${TAG_ID_CLIENT}" | tr '[:upper:]' '[:lower:]' `
+
+export TAG_CONSUMER=consumer
+export TAG_ID_CONSUMER=${TAG_ORG}-${TAG_CONSUMER}
+export TAG_PREFIX_CONSUMER=`echo "${TAG_ORG}/${TAG_ID_CONSUMER}" | tr '[:upper:]' '[:lower:]' `
+
+export ACTIVEMQ_DOCKER_GIT_USER=ccrepo
+export ACTIVEMQ_DOCKER_GIT_PASSWORD=github_pat_NNN
+export ACTIVEMQ_DOCKER_GIT_SERVER=${TAG_ID_SERVER}
+export ACTIVEMQ_DOCKER_GIT_CLIENT=${TAG_ID_CLIENT}
+export ACTIVEMQ_DOCKER_GIT_CONSUMER=${TAG_ID_CONSUMER}
+export ACTIVEMQ_DOCKER_BUILD="${1}"
+export ACTIVEMQ_DOCKER_NETWORK_TYPE=host # or host bridge
+export ACTIVEMQ_DOCKER_ACTIVEMQ_SHA512=68442de0725ce45bb9ce5287e2290483cf24025b2b23708749440f40efef72810a0097049a3643f6f87052f75660930e0ea7f235e899a6e9d4a60516bfca459e
+export ACTIVEMQ_DOCKER_ACTIVEMQ_PACKAGENAME=activemq-parent-6.2.0-source-release
+#export ACTIVEMQ_DOCKER_ACTIVEMQ_DOWNLOAD=https://downloads.apache.org/activemq/6.2.0/${ACTIVEMQ_DOCKER_ACTIVEMQ_PACKAGENAME}.zip
+export ACTIVEMQ_DOCKER_ACTIVEMQ_DOWNLOAD=https://archive.apache.org/dist/activemq/6.2.0/${ACTIVEMQ_DOCKER_ACTIVEMQ_PACKAGENAME}.zip
+export ACTIVEMQ_DOCKER_GRADLE_PACKAGENAME=gradle-8.12-bin
+export ACTIVEMQ_DOCKER_GRADLE_DOWNLOAD=https://services.gradle.org/distributions/${ACTIVEMQ_DOCKER_GRADLE_PACKAGENAME}.zip
+export ACTIVEMQ_DOCKER_SERVER_HOSTNAME=localhost
+
+export YAML="./docker/docker-compose-${TAG_ORG}.yml"
+
