@@ -8,9 +8,9 @@ apachectl -DFOREGROUND &
 
 /usr/share/tomcat10/bin/catalina.sh run &
 
-tail -f /dev/null &
+#tail -f /dev/null &
 
-/usr/sbin/sshd -D & 
+#/usr/sbin/sshd -D & 
 
 wait -n
 
